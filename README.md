@@ -45,10 +45,10 @@ If you need to know **what happened**, **when**, and **why**, ETW Monitor makes 
 
 ## Screenshots (placeholders)
 
-![Dashboard](https://raw.githubusercontent.com/trucule/ET_Ducky-Desktop/main/docs/images/dashboard.png)
-![Events](https://raw.githubusercontent.com/trucule/ET_Ducky-Desktop/main/docs/images/events.png)
-![Diagnostics](https://raw.githubusercontent.com/trucule/ET_Ducky-Desktop/main/docs/images/diagnostics.png)
-![Settings](https://raw.githubusercontent.com/trucule/ET_Ducky-Desktop/main/docs/images/settings.png)
+<img width="1912" height="996" alt="Image" src="https://github.com/user-attachments/assets/bd1d1a77-a626-4600-b5c4-0f87f704b6ac" />
+<img width="1917" height="999" alt="Image" src="https://github.com/user-attachments/assets/9dae7dea-1cbe-4361-a517-85769586056c" />
+<img width="1915" height="1002" alt="Image" src="https://github.com/user-attachments/assets/f43e53e9-36eb-48ee-b66e-cf22036b2c56" />
+<img width="1915" height="1000" alt="Image" src="https://github.com/user-attachments/assets/5ed83c05-1ded-438a-a6ea-a1e6bd4ab2f0" />
 
 ## Installation
 
