@@ -45,7 +45,7 @@ If you need to know **what happened**, **when**, and **why**, ETW Monitor makes 
 
 ## Screenshots (placeholders)
 
-![Dashboard](docs/images/dashboard.png)  
+![Dashboard](docs/images/events.png)  
 ![Events](docs/images/events.png)  
 ![Diagnostics](docs/images/diagnostics.png)  
 ![Settings](docs/images/settings.png)
