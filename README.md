@@ -30,7 +30,7 @@ The application is designed for power users, system administrators, developers, 
 - Settings are stored locally per user  
 - No external telemetry
 
-## Why Use ETW Monitor Desktop?
+## Why Use ET_Ducky-Desktop?
 
 Windows hides most internal activity from plain view. ETW Monitor provides:
 
