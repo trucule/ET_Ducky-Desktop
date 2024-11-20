@@ -45,10 +45,10 @@ If you need to know **what happened**, **when**, and **why**, ETW Monitor makes 
 
 ## Screenshots (placeholders)
 
-![Dashboard](docs/images/events.png?raw=true)
-![Events](docs/images/events.png?raw=true) 
-![Diagnostics](docs/images/diagnostics.png?raw=true)
-![Settings](docs/images/settings.png?raw=true)
+![Dashboard](./docs/images/events.png)
+![Events](./docs/images/events.png) 
+![Diagnostics](./docs/images/diagnostics.png)
+![Settings](./docs/images/settings.png)
 
 ## Installation
 
