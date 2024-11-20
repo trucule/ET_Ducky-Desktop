@@ -1,0 +1,420 @@
+@page "/ai-insights"
+@using EtwMonitor.Desktop.Services
+@inject AIAnalysisService AIAnalysis
+@inject DiagnosticsService Diagnostics
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>AI Insights - ET Ducky</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">AI Insights History</MudText>
+
+<MudGrid>
+    <!-- Controls -->
+    <MudItem xs="12">
+        <MudCard Elevation="2">
+            <MudCardContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    <MudSwitch Value="@_isEnabled"
+                               ValueChanged="@((bool val) => { _isEnabled = val; if (val) AIAnalysis.Start(); else AIAnalysis.Stop(); })"
+                               Color="Color.Primary" 
+                               Label="@(_isEnabled ? "Monitoring Enabled" : "Monitoring Disabled")"
+                               T="bool" />
+                    <MudSpacer />
+                    <MudStack Row="true" Spacing="2">
+                        <MudChip T="string" Icon="@Icons.Material.Filled.Timeline" Color="Color.Info">
+                            @_insights.Count Total Insights
+                        </MudChip>
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.Delete"
+                                   OnClick="ClearInsights"
+                                   Size="Size.Small">
+                            Clear History
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Refresh"
+                                   OnClick="RefreshInsights"
+                                   Size="Size.Small">
+                            Refresh
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-2">
+                    <MudText Typo="Typo.caption" Class="mr-2">
+                        On-demand diagnostics:
+                    </MudText>
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Disabled="@_isRunningDiagnostic"
+                               OnClick="RunDiskSpaceDiagnostic">
+                        @if (_isRunningDiagnostic && _currentDiagnosticLabel == "disk")
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                            <text>Checking Disk Space...</text>
+                        }
+                        else
+                        {
+                            <text>Check Disk Space</text>
+                        }
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Secondary"
+                               Size="Size.Small"
+                               Disabled="@_isRunningDiagnostic"
+                               OnClick="RunLargeFileScan">
+                        @if (_isRunningDiagnostic && _currentDiagnosticLabel == "largefiles")
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                            <text>Scanning C:\ for Large Files...</text>
+                        }
+                        else
+                        {
+                            <text>Scan C:\ for Large Files</text>
+                        }
+                    </MudButton>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Filters -->
+    <MudItem xs="12">
+        <MudCard Elevation="2">
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField T="string"
+                                      Value="@_searchText" 
+                                      ValueChanged="@((string value) => { _searchText = value; ApplyFilters(); })"
+                                      Label="Search Insights" 
+                                      Placeholder="Search by title or content..."
+                                      Adornment="Adornment.Start" 
+                                      AdornmentIcon="@Icons.Material.Filled.Search"
+                                      Clearable="true"
+                                      Immediate="true" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudSelect T="string"
+                                   Value="@_selectedSeverity"
+                                   ValueChanged="@((string val) => { _selectedSeverity = val; ApplyFilters(); })"
+                                   Label="Severity Filter"
+                                   AdornmentIcon="@Icons.Material.Filled.FilterList"
+                                   Adornment="Adornment.Start">
+                            <MudSelectItem T="string" Value="@("All")">All Severities</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("High")">High</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Low")">Low</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudSelect T="string"
+                                   Value="@_sortOrder"
+                                   ValueChanged="@((string val) => { _sortOrder = val; ApplyFilters(); })"
+                                   Label="Sort Order"
+                                   AdornmentIcon="@Icons.Material.Filled.Sort"
+                                   Adornment="Adornment.Start">
+                            <MudSelectItem T="string" Value="@("Newest")">Newest First</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Oldest")">Oldest First</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Severity")">By Severity</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Insights List -->
+    <MudItem xs="12">
+        @if (!_isEnabled)
+        {
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudAlert Severity="MudBlazor.Severity.Info">
+                        <MudText Typo="Typo.h6" Class="mb-2">AI Monitoring Disabled</MudText>
+                        <MudText>Enable AI monitoring to start generating insights about your system activity.</MudText>
+                    </MudAlert>
+                </MudCardContent>
+            </MudCard>
+        }
+        else if (_filteredInsights.Count == 0 && _insights.Count == 0)
+        {
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="pa-6">
+                        <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+                        <MudText Typo="Typo.h6">Monitoring Your System</MudText>
+                        <MudText Typo="Typo.body2">First insight will appear within 30 seconds...</MudText>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        }
+        else if (_filteredInsights.Count == 0)
+        {
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudAlert Severity="MudBlazor.Severity.Info">
+                        No insights match your search criteria. Try adjusting your filters.
+                    </MudAlert>
+                </MudCardContent>
+            </MudCard>
+        }
+        else
+        {
+            @foreach (var insight in _filteredInsights)
+            {
+                <MudCard Elevation="2" Class="mb-3">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@GetSeverityIcon(insight.Severity)" 
+                                         Color="@GetSeverityColor(insight.Severity)" />
+                                <MudText Typo="Typo.h6">@insight.Title</MudText>
+                                <MudSpacer />
+                                <MudChip T="string" Size="Size.Small" Color="@GetSeverityColor(insight.Severity)">
+                                    @insight.Severity.ToString()
+                                </MudChip>
+                                <MudText Typo="Typo.caption">@insight.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                            </MudStack>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body1" Style="white-space: pre-wrap;" Class="mb-3">
+                            @insight.Analysis
+                        </MudText>
+                        
+                        <MudDivider Class="my-3" />
+                        
+                        <MudStack Row="true" Spacing="2">
+                            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.DataUsage">
+                                @insight.EventCount events analyzed
+                            </MudChip>
+                            @if (insight.RelatedEvents.Any())
+                            {
+                                <MudButton Variant="Variant.Text" 
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           OnClick="@(() => ToggleEvents(insight))">
+                                    @(_expandedInsights.Contains(insight) ? "Hide" : "Show") Related Events
+                                </MudButton>
+                            }
+                        </MudStack>
+
+                        @if (_expandedInsights.Contains(insight) && insight.RelatedEvents.Any())
+                        {
+                            <MudPaper Elevation="0" Class="mt-3 pa-3" Style="background-color: var(--mud-palette-surface);">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">Related Events:</MudText>
+                                <MudSimpleTable Dense="true" Hover="true">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Type</th>
+                                            <th>Process</th>
+                                            <th>Operation</th>
+                                            <th>Path/Details</th>
+                                            <th>Result</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var evt in insight.RelatedEvents.Take(10))
+                                        {
+                                            <tr>
+                                                <td>@evt.Timestamp.ToString("HH:mm:ss.fff")</td>
+                                                <td>@evt.Type</td>
+                                                <td>@(evt.ProcessName ?? "Unknown")</td>
+                                                <td>@evt.Operation</td>
+                                                <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                                    @(evt.Path ?? evt.Details ?? "—")
+                                                </td>
+                                                <td>@evt.Result</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                                @if (insight.RelatedEvents.Count > 10)
+                                {
+                                    <MudText Typo="Typo.caption" Class="mt-2">
+                                        Showing first 10 of @insight.RelatedEvents.Count events
+                                    </MudText>
+                                }
+                            </MudPaper>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            }
+        }
+    </MudItem>
+</MudGrid>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-4">
+    Back to Dashboard
+</MudButton>
+
+@code {
+    private bool _isEnabled = false;
+    private List<AIInsight> _insights = new();
+    private List<AIInsight> _filteredInsights = new();
+    private HashSet<AIInsight> _expandedInsights = new();
+
+    private string _searchText = string.Empty;
+    private string _selectedSeverity = "All";
+    private string _sortOrder = "Newest";
+
+    // Diagnostics state
+    private bool _isRunningDiagnostic = false;
+    private string _currentDiagnosticLabel = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        AIAnalysis.InsightGenerated += OnInsightGenerated;
+        _isEnabled = AIAnalysis.IsEnabled;
+        RefreshInsights();
+    }
+
+    protected override void OnParametersSet()
+    {
+        RefreshInsights();
+    }
+
+    private void OnInsightGenerated(object? sender, AIInsight insight)
+    {
+        InvokeAsync(() =>
+        {
+            RefreshInsights();
+            StateHasChanged();
+        });
+    }
+
+    private void RefreshInsights()
+    {
+        _insights = AIAnalysis.RecentInsights.ToList();
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        var filtered = _insights.AsEnumerable();
+
+        // Search filter
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var searchLower = _searchText.ToLowerInvariant();
+            filtered = filtered.Where(i =>
+                i.Title.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ||
+                i.Analysis.Contains(searchLower, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Severity filter
+        if (_selectedSeverity != "All" &&
+            Enum.TryParse<InsightSeverity>(_selectedSeverity, out var severity))
+        {
+            filtered = filtered.Where(i => i.Severity == severity);
+        }
+
+        // Sort
+        filtered = _sortOrder switch
+        {
+            "Newest" => filtered.OrderByDescending(i => i.Timestamp),
+            "Oldest" => filtered.OrderBy(i => i.Timestamp),
+            "Severity" => filtered.OrderByDescending(i => i.Severity),
+            _ => filtered.OrderByDescending(i => i.Timestamp)
+        };
+
+        _filteredInsights = filtered.ToList();
+        StateHasChanged();
+    }
+
+    private void ClearInsights()
+    {
+        _insights.Clear();
+        _filteredInsights.Clear();
+        _expandedInsights.Clear();
+        StateHasChanged();
+    }
+
+    private void ToggleEvents(AIInsight insight)
+    {
+        if (_expandedInsights.Contains(insight))
+            _expandedInsights.Remove(insight);
+        else
+            _expandedInsights.Add(insight);
+    }
+
+    private string GetSeverityIcon(InsightSeverity severity) =>
+        severity switch
+        {
+            InsightSeverity.High => Icons.Material.Filled.Warning,
+            InsightSeverity.Medium => Icons.Material.Filled.Info,
+            InsightSeverity.Low => Icons.Material.Filled.CheckCircle,
+            _ => Icons.Material.Filled.Info
+        };
+
+    private Color GetSeverityColor(InsightSeverity severity) =>
+        severity switch
+        {
+            InsightSeverity.High => Color.Error,
+            InsightSeverity.Medium => Color.Warning,
+            InsightSeverity.Low => Color.Success,
+            _ => Color.Default
+        };
+
+    private async Task RunDiskSpaceDiagnostic()
+    {
+        _isRunningDiagnostic = true;
+        _currentDiagnosticLabel = "disk";
+        StateHasChanged();
+
+        try
+        {
+            var result = await Diagnostics.RunActionAsync(
+                DiagnosticActionType.CheckFreeDiskSpace);
+
+            await AIAnalysis.AnalyzeDiagnosticResultAsync(
+                "Check free disk space on all drives",
+                result);
+
+            RefreshInsights();
+        }
+        finally
+        {
+            _isRunningDiagnostic = false;
+            _currentDiagnosticLabel = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunLargeFileScan()
+    {
+        _isRunningDiagnostic = true;
+        _currentDiagnosticLabel = "largefiles";
+        StateHasChanged();
+
+        try
+        {
+            var result = await Diagnostics.RunActionAsync(
+                DiagnosticActionType.ScanFolderForLargeFiles,
+                @"C:\");
+
+            await AIAnalysis.AnalyzeDiagnosticResultAsync(
+                @"Scan C:\ for very large files that could impact disk space or performance",
+                result);
+
+            RefreshInsights();
+        }
+        finally
+        {
+            _isRunningDiagnostic = false;
+            _currentDiagnosticLabel = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        AIAnalysis.InsightGenerated -= OnInsightGenerated;
+    }
+}

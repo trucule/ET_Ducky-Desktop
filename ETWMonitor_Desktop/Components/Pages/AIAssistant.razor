@@ -1,0 +1,498 @@
+@page "/ai"
+@using EtwMonitor.Desktop.Services
+@using EtwMonitor.Core.Models
+@inject AIProviderService AIService
+@inject MonitorStateService MonitorState
+@inject NavigationManager Navigation
+
+<PageTitle>AI Assistant - ET Ducky</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">AI Troubleshooting Assistant</MudText>
+
+@if (_hasError)
+{
+    <MudAlert Severity="MudBlazor.Severity.Error" Class="mb-4">
+        <MudText Typo="Typo.h6">Error</MudText>
+        <MudText>@_errorMessage</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-2">
+            Back to Dashboard
+        </MudButton>
+    </MudAlert>
+}
+else if (!_hasProviders)
+{
+    <MudCard Elevation="2">
+        <MudCardContent>
+            <MudAlert Severity="MudBlazor.Severity.Info">
+                <MudText Typo="Typo.h6" Class="mb-2">No AI Providers Configured</MudText>
+                <MudText Class="mb-2">
+                    To use the AI Assistant, you need to configure at least one AI provider with an API key:
+                </MudText>
+                <MudStack Spacing="1" Class="mb-3">
+                    <MudText>• <strong>Microsoft Copilot</strong> - Azure OpenAI Service</MudText>
+                    <MudText>• <strong>Claude</strong> - Anthropic API</MudText>
+                    <MudText>• <strong>ChatGPT</strong> - OpenAI API</MudText>
+                </MudStack>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Settings"
+                           Href="/settings">
+                    Go to Settings to Configure
+                </MudButton>
+            </MudAlert>
+        </MudCardContent>
+    </MudCard>
+}
+else
+{
+    <MudGrid>
+        <!-- Provider Selection & Stats -->
+        <MudItem xs="12">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudText Typo="Typo.subtitle1"><strong>AI Provider:</strong></MudText>
+                                <MudSelect T="string" 
+                                           Value="@_selectedProviderId" 
+                                           ValueChanged="OnProviderChanged"
+                                           Variant="Variant.Outlined"
+                                           Dense="true">
+                                    @foreach (var provider in _providers)
+                                    {
+                                        <MudSelectItem T="string" Value="@provider.Id">
+                                            @provider.Name @(provider.IsConfigured ? "" : "(Not Configured)")
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                                
+                                @if (_currentProvider != null)
+                                {
+                                    @if (_currentProvider.IsConfigured)
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Icon="@Icons.Material.Filled.Check">
+                                            Ready
+                                        </MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Color="Color.Warning" Size="Size.Small">
+                                            Not Configured
+                                        </MudChip>
+                                    }
+                                }
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudStack Row="true" Spacing="4">
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.caption">Events Available</MudText>
+                                    <MudText Typo="Typo.h6">@_availableEvents.ToString("N0")</MudText>
+                                </MudStack>
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.caption">Monitoring</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@(MonitorState.IsMonitoring ? Color.Success : Color.Default)">
+                                        @(MonitorState.IsMonitoring ? "Active" : "Inactive")
+                                    </MudChip>
+                                </MudStack>
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.caption">Context Mode</MudText>
+                                    <MudSwitch @bind-Value="_useEventContext" 
+                                               Color="Color.Primary" 
+                                               Size="Size.Small"
+                                               Label="@(_useEventContext ? "ON" : "OFF")"
+                                               T="bool" />
+                                </MudStack>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Quick Actions -->
+        <MudItem xs="12">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Quick Troubleshooting Actions:</MudText>
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Primary" 
+                                   Size="Size.Small"
+                                   OnClick="@(() => SendQuickMessage("Analyze the last 100 events and tell me if there are any errors or issues I should be concerned about."))">
+                            Analyze Recent Activity
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Primary" 
+                                   Size="Size.Small"
+                                   OnClick="@(() => SendQuickMessage("Show me any repeated errors or failures in the recent events."))">
+                            Find Repeated Errors
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Primary" 
+                                   Size="Size.Small"
+                                   OnClick="@(() => SendQuickMessage("What processes are generating the most activity right now?"))">
+                            High Activity Processes
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Chat Interface -->
+        <MudItem xs="12">
+            <MudCard Elevation="2" Style="height: calc(100vh - 450px); display: flex; flex-direction: column;">
+                <MudToolBar>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Chat" Class="mr-2" />
+                        Troubleshooting Conversation
+                    </MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Text" 
+                               Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               OnClick="ClearChat">
+                        Clear
+                    </MudButton>
+                </MudToolBar>
+                <MudCardContent Style="flex-grow: 1; overflow-y: auto; padding: 16px;">
+                    @if (!_messages.Any())
+                    {
+                        <MudAlert Severity="MudBlazor.Severity.Info" Variant="Variant.Outlined">
+                            <MudText Typo="Typo.h6" Class="mb-2">👋 AI Troubleshooting Assistant</MudText>
+                            <MudText Class="mb-2">
+                                I can help you diagnose system issues by analyzing your ETW events. Try asking:
+                            </MudText>
+                            <ul class="mt-2 mb-2">
+                                <li><strong>"My Firefox shortcut isn't working properly"</strong></li>
+                                <li><strong>"Why is my application crashing?"</strong></li>
+                                <li><strong>"What's causing high disk activity?"</strong></li>
+                                <li><strong>"Find registry errors from the last hour"</strong></li>
+                                <li><strong>"Why can't I access this file path?"</strong></li>
+                            </ul>
+                            <MudAlert Severity="MudBlazor.Severity.Warning" Dense="true" Variant="Variant.Text">
+                                💡 <strong>Tip:</strong> Turn on "Context Mode" to automatically include relevant events with each question.
+                            </MudAlert>
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="2">
+                            @foreach (var message in _messages)
+                            {
+                                <MudPaper Elevation="1" Class="pa-3" Style="@(message.IsUser ? "background-color: var(--mud-palette-primary); color: white; margin-left: 20%;" : "background-color: var(--mud-palette-surface); margin-right: 20%;")">
+                                    <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                                        <MudAvatar Color="@(message.IsUser ? Color.Primary : Color.Secondary)" Size="Size.Small">
+                                            <MudIcon Icon="@(message.IsUser ? Icons.Material.Filled.Person : Icons.Material.Filled.Psychology)" />
+                                        </MudAvatar>
+                                        <div style="flex-grow: 1;">
+                                            <MudText Typo="Typo.caption" Class="mb-1">
+                                                @(message.IsUser ? "You" : (_currentProvider?.Name ?? "AI"))
+                                                @if (message.EventCount > 0)
+                                                {
+                                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                                                        @message.EventCount events analyzed
+                                                    </MudChip>
+                                                }
+                                            </MudText>
+                                            <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@message.Text</MudText>
+                                        </div>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                            @if (_isTyping)
+                            {
+                                <MudPaper Elevation="1" Class="pa-3" Style="background-color: var(--mud-palette-surface); margin-right: 20%;">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudProgressCircular Color="Color.Secondary" Size="Size.Small" Indeterminate="true" />
+                                        <MudText Typo="Typo.caption">@_analysisStatus</MudText>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudCardContent>
+                <MudDivider />
+                <div Class="pa-3">
+                    <MudStack Row="true" Spacing="2">
+                        <MudTextField @bind-Value="_currentMessage" 
+                                      Label="Describe your issue or ask a question..." 
+                                      Variant="Variant.Outlined"
+                                      FullWidth="true"
+                                      Disabled="@(_isTyping || _currentProvider == null || !_currentProvider.IsConfigured)"
+                                      OnKeyDown="@HandleKeyDown"
+                                      Lines="3"
+                                      Placeholder="e.g., 'My Firefox shortcut opens File Explorer instead of Firefox'" />
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary"
+                                   OnClick="SendMessage"
+                                   Disabled="@(_isTyping || string.IsNullOrWhiteSpace(_currentMessage) || _currentProvider == null || !_currentProvider.IsConfigured)"
+                                   StartIcon="@Icons.Material.Filled.Send">
+                            Analyze
+                        </MudButton>
+                    </MudStack>
+                </div>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private class ChatMessage
+    {
+        public string Text { get; set; } = "";
+        public bool IsUser { get; set; }
+        public int EventCount { get; set; }
+    }
+
+    private List<ChatMessage> _messages = new();
+    private string _currentMessage = "";
+    private bool _isTyping = false;
+    private bool _hasError = false;
+    private string _errorMessage = "";
+    private bool _hasProviders = false;
+    private List<IAIProvider> _providers = new();
+    private string _selectedProviderId = "";
+    private IAIProvider? _currentProvider;
+    private int _availableEvents = 0;
+    private bool _useEventContext = true;
+    private string _analysisStatus = "AI is analyzing your events...";
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            if (AIService == null)
+            {
+                _hasError = true;
+                _errorMessage = "AI Service is not available.";
+                return;
+            }
+
+            _providers = AIService.AvailableProviders?.ToList() ?? new List<IAIProvider>();
+            _hasProviders = _providers.Any();
+            
+            if (_hasProviders)
+            {
+                _currentProvider = AIService.CurrentProvider;
+                _selectedProviderId = _currentProvider?.Id ?? _providers.First().Id;
+            }
+
+            _availableEvents = MonitorState?.GetCapturedEvents()?.Count ?? 0;
+        }
+        catch (Exception ex)
+        {
+            _hasError = true;
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private void OnProviderChanged(string providerId)
+    {
+        _selectedProviderId = providerId;
+        AIService?.SetCurrentProvider(providerId);
+        _currentProvider = AIService?.CurrentProvider;
+        StateHasChanged();
+    }
+
+    private async Task SendQuickMessage(string message)
+    {
+        _currentMessage = message;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_currentMessage)) return;
+        if (_currentProvider == null || !_currentProvider.IsConfigured) return;
+
+        var userMessage = _currentMessage.Trim();
+        _currentMessage = "";
+        
+        _messages.Add(new ChatMessage { Text = userMessage, IsUser = true });
+        
+        _isTyping = true;
+        _analysisStatus = "Searching through events...";
+        StateHasChanged();
+
+        try
+        {
+            // Get relevant events based on the user's question
+            var events = MonitorState?.GetCapturedEvents() ?? new List<SystemEvent>();
+            _availableEvents = events.Count;
+
+            _analysisStatus = $"Analyzing {events.Count} events...";
+            StateHasChanged();
+
+            // Build enhanced prompt with event context
+            var enhancedPrompt = BuildTroubleshootingPrompt(userMessage, events);
+
+            _analysisStatus = "Generating response...";
+            StateHasChanged();
+
+            // Get AI response
+            var response = await AIService.ChatAsync(enhancedPrompt);
+            
+            _messages.Add(new ChatMessage 
+            { 
+                Text = response, 
+                IsUser = false,
+                EventCount = _useEventContext ? events.Count : 0
+            });
+        }
+        catch (Exception ex)
+        {
+            _messages.Add(new ChatMessage { Text = $"Error: {ex.Message}", IsUser = false });
+        }
+        finally
+        {
+            _isTyping = false;
+            StateHasChanged();
+        }
+    }
+
+    private string BuildTroubleshootingPrompt(string userQuestion, List<SystemEvent> events)
+    {
+        var prompt = $@"You are a Windows system troubleshooting expert. A user has described an issue or asked a question.
+
+**USER QUESTION:**
+{userQuestion}
+
+";
+
+        if (_useEventContext && events.Any())
+        {
+            // Analyze events to find relevant ones
+            var relevantEvents = FindRelevantEvents(userQuestion, events);
+
+            prompt += $@"**AVAILABLE ETW EVENT DATA:**
+Total events captured: {events.Count}
+Time range: {events.First().Timestamp:HH:mm:ss} to {events.Last().Timestamp:HH:mm:ss}
+
+";
+
+            if (relevantEvents.Any())
+            {
+                prompt += $@"**RELEVANT EVENTS FOUND ({relevantEvents.Count}):**
+{FormatEventsForAI(relevantEvents.Take(50).ToList())}
+
+";
+            }
+
+            // Add event summary
+            var errorEvents = events.Where(e => 
+                e.Result?.Contains("ERROR", StringComparison.OrdinalIgnoreCase) == true ||
+                e.Result?.Contains("FAIL", StringComparison.OrdinalIgnoreCase) == true ||
+                e.Result?.Contains("DENIED", StringComparison.OrdinalIgnoreCase) == true).ToList();
+
+            if (errorEvents.Any())
+            {
+                prompt += $@"**ERRORS/FAILURES DETECTED ({errorEvents.Count}):**
+{FormatEventsForAI(errorEvents.Take(20).ToList())}
+
+";
+            }
+        }
+
+        prompt += @"**INSTRUCTIONS:**
+1. Analyze the available event data to diagnose the issue
+2. Identify the root cause based on the events
+3. Provide specific, step-by-step remediation instructions
+4. If you need more information, ask specific questions
+5. Be concise but thorough
+
+Provide your analysis and recommendations:";
+
+        return prompt;
+    }
+
+    private List<SystemEvent> FindRelevantEvents(string userQuestion, List<SystemEvent> allEvents)
+    {
+        var keywords = ExtractKeywords(userQuestion);
+        var relevantEvents = new List<SystemEvent>();
+
+        foreach (var evt in allEvents)
+        {
+            bool isRelevant = false;
+
+            // Check if event matches any keywords
+            foreach (var keyword in keywords)
+            {
+                if (evt.ProcessName?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true ||
+                    evt.Operation?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true ||
+                    evt.Path?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true ||
+                    evt.Details?.Contains(keyword, StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    isRelevant = true;
+                    break;
+                }
+            }
+
+            // Also include error events
+            if (evt.Result?.Contains("ERROR", StringComparison.OrdinalIgnoreCase) == true ||
+                evt.Result?.Contains("FAIL", StringComparison.OrdinalIgnoreCase) == true ||
+                evt.Result?.Contains("DENIED", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                isRelevant = true;
+            }
+
+            if (isRelevant)
+            {
+                relevantEvents.Add(evt);
+            }
+        }
+
+        return relevantEvents.OrderByDescending(e => e.Timestamp).ToList();
+    }
+
+    private List<string> ExtractKeywords(string text)
+    {
+        // Extract potential application names, file types, and important terms
+        var words = text.Split(new[] { ' ', ',', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+        var keywords = new List<string>();
+
+        var stopWords = new HashSet<string> { "the", "a", "an", "is", "are", "my", "not", "working", "why", "how", "what", "when", "where" };
+
+        foreach (var word in words)
+        {
+            var cleanWord = word.Trim().ToLower();
+            if (cleanWord.Length > 3 && !stopWords.Contains(cleanWord))
+            {
+                keywords.Add(cleanWord);
+            }
+        }
+
+        return keywords;
+    }
+
+    private string FormatEventsForAI(List<SystemEvent> events)
+    {
+        return string.Join("\n", events.Select(e => 
+            $"[{e.Timestamp:HH:mm:ss.fff}] {e.Type} | {e.ProcessName ?? "Unknown"} | {e.Operation} | {e.Path ?? e.Details ?? "—"} | {e.Result ?? "—"}"
+        ));
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        // Enter key sends message (not Shift+Enter which adds newline)
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            // Prevent sending empty messages; SendMessage has its own guard too,
+            // but this keeps it extra cheap.
+            if (!string.IsNullOrWhiteSpace(_currentMessage) &&
+                _currentProvider != null &&
+                _currentProvider.IsConfigured &&
+                !_isTyping)
+            {
+                await SendMessage();
+            }
+        }
+    }
+
+    private void ClearChat()
+    {
+        _messages.Clear();
+        StateHasChanged();
+    }
+}

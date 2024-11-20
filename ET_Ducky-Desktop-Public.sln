@@ -1,0 +1,33 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36623.8
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ETWMonitor_Desktop", "ETWMonitor_Desktop\ETWMonitor_Desktop.csproj", "{7F72C2C8-A9E2-E8D6-85BB-BBFF8AA61371}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EtwMonitor.Core", "ETWMonitor_Core\EtwMonitor.Core.csproj", "{A55FF329-2F01-1F3E-36A7-887AE395CAC7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7F72C2C8-A9E2-E8D6-85BB-BBFF8AA61371}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F72C2C8-A9E2-E8D6-85BB-BBFF8AA61371}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F72C2C8-A9E2-E8D6-85BB-BBFF8AA61371}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{7F72C2C8-A9E2-E8D6-85BB-BBFF8AA61371}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F72C2C8-A9E2-E8D6-85BB-BBFF8AA61371}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F72C2C8-A9E2-E8D6-85BB-BBFF8AA61371}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{A55FF329-2F01-1F3E-36A7-887AE395CAC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A55FF329-2F01-1F3E-36A7-887AE395CAC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A55FF329-2F01-1F3E-36A7-887AE395CAC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A55FF329-2F01-1F3E-36A7-887AE395CAC7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {23B8B70F-8E49-48BD-A3C7-7B5E9B9C7524}
+	EndGlobalSection
+EndGlobal

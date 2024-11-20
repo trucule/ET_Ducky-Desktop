@@ -1,0 +1,114 @@
+@page "/patterns"
+@using EtwMonitor.Desktop.Services
+@using EtwMonitor.Core.Models
+@inject MonitorStateService MonitorState
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Patterns - ET Ducky</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Detected Patterns</MudText>
+
+@if (!MonitorState.IsMonitoring)
+{
+    <MudAlert Severity="MudBlazor.Severity.Info">
+        Monitoring is not active. Start monitoring from the Dashboard to detect patterns.
+    </MudAlert>
+}
+else if (!_patterns.Any())
+{
+    <MudAlert Severity="MudBlazor.Severity.Success">
+        No patterns detected yet. Your system is operating normally!
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <!-- Filter Controls -->
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudStack Row="true" Spacing="2">
+                    <MudSelect T="EtwMonitor.Core.Models.Severity?"
+                               @bind-Value="_severityFilter"
+                               Label="Severity Filter"
+                               Clearable="true">
+                        <MudSelectItem Value="@((EtwMonitor.Core.Models.Severity?)null)">All</MudSelectItem>
+                        <MudSelectItem Value="@((EtwMonitor.Core.Models.Severity?)EtwMonitor.Core.Models.Severity.Critical)">Critical</MudSelectItem>
+                        <MudSelectItem Value="@((EtwMonitor.Core.Models.Severity?)EtwMonitor.Core.Models.Severity.High)">High</MudSelectItem>
+                        <MudSelectItem Value="@((EtwMonitor.Core.Models.Severity?)EtwMonitor.Core.Models.Severity.Medium)">Medium</MudSelectItem>
+                        <MudSelectItem Value="@((EtwMonitor.Core.Models.Severity?)EtwMonitor.Core.Models.Severity.Low)">Low</MudSelectItem>
+                    </MudSelect>
+                    
+                    <MudTextField @bind-Value="_searchText" 
+                                  Label="Search" 
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search" />
+                    
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary"
+                               OnClick="ApplyFilters">
+                        Apply Filters
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Pattern List -->
+        <MudItem xs="12">
+            <MudStack Spacing="2">
+                @foreach (var pattern in GetFilteredPatterns())
+                {
+                    <PatternCard Pattern="@pattern" OnAnalyzeClick="@(() => NavigateToAI(pattern))" />
+                }
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private List<DetectedPattern> _patterns = new();
+    private EtwMonitor.Core.Models.Severity? _severityFilter;
+    private string _searchText = "";
+
+    protected override void OnInitialized()
+    {
+        MonitorState.PatternDetected += OnPatternDetected;
+    }
+
+    private void OnPatternDetected(object? sender, DetectedPattern pattern)
+    {
+        _patterns.Insert(0, pattern);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private IEnumerable<DetectedPattern> GetFilteredPatterns()
+    {
+        var filtered = _patterns.AsEnumerable();
+
+        if (_severityFilter.HasValue)
+            filtered = filtered.Where(p => p.Severity == _severityFilter.Value);
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+            filtered = filtered.Where(p => 
+                p.Description.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+                p.PatternType.Contains(_searchText, StringComparison.OrdinalIgnoreCase));
+
+        return filtered;
+    }
+
+    private void ApplyFilters()
+    {
+        StateHasChanged();
+    }
+
+    private void NavigateToAI(DetectedPattern pattern)
+    {
+        Navigation.NavigateTo($"/ai?patternId={pattern.Id}");
+    }
+
+    public void Dispose()
+    {
+        MonitorState.PatternDetected -= OnPatternDetected;
+    }
+}

@@ -1,0 +1,54 @@
+@using EtwMonitor.Core.Models
+
+<MudCard Elevation="1" Class="mb-2">
+    <MudCardContent>
+        <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+            <MudIcon Icon="@GetSeverityIcon()" Color="@GetSeverityColor()" Size="Size.Large" />
+            
+            <div style="flex: 1;">
+                <MudText Typo="Typo.h6">@Pattern.PatternType</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @Pattern.Description
+                </MudText>
+                <MudText Typo="Typo.caption" Class="mt-1">
+                    Detected: @Pattern.LastSeen.ToString("g") | Confidence: @Pattern.Confidence.ToString("P0") | Occurrences: @Pattern.OccurrenceCount
+                </MudText>
+            </div>
+            
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Primary" 
+                       Size="Size.Small"
+                       OnClick="@OnAnalyzeClick">
+                Analyze
+            </MudButton>
+        </MudStack>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter]
+    public DetectedPattern Pattern { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnAnalyzeClick { get; set; }
+
+    private string GetSeverityIcon() => Pattern.Severity switch
+    {
+        EtwMonitor.Core.Models.Severity.Critical => Icons.Material.Filled.Error,
+        EtwMonitor.Core.Models.Severity.High => Icons.Material.Filled.Warning,
+        EtwMonitor.Core.Models.Severity.Medium => Icons.Material.Filled.Info,
+        EtwMonitor.Core.Models.Severity.Low => Icons.Material.Filled.CheckCircle,
+        EtwMonitor.Core.Models.Severity.Info => Icons.Material.Filled.Info,
+        _ => Icons.Material.Filled.CheckCircle
+    };
+
+    private Color GetSeverityColor() => Pattern.Severity switch
+    {
+        EtwMonitor.Core.Models.Severity.Critical => Color.Error,
+        EtwMonitor.Core.Models.Severity.High => Color.Warning,
+        EtwMonitor.Core.Models.Severity.Medium => Color.Info,
+        EtwMonitor.Core.Models.Severity.Low => Color.Success,
+        EtwMonitor.Core.Models.Severity.Info => Color.Default,
+        _ => Color.Default
+    };
+}

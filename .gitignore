@@ -1,0 +1,18 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/.vs/
+*.user
+*.suo
+
+# Logs
+**/*.log
+
+# Local configuration
+appsettings.json
+
+# License generator & keys
+ETDucky.LicenseGenerator/
+**/private_key.txt
+**/generated_licenses/
+**/key_backups/

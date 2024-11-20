@@ -1,0 +1,272 @@
+@page "/settings"
+@using EtwMonitor.Desktop.Services
+@inject SettingsService SettingsService
+@inject AIProviderService AIService
+@inject MonitorStateService MonitorState
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Settings - ET Ducky</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Settings</MudText>
+
+@if (MonitorState.IsMonitoring)
+{
+    <MudAlert Severity="MudBlazor.Severity.Warning" Class="mb-4">
+        <strong>Monitoring is currently active.</strong> Changes to ETW Monitoring settings will take effect when you stop and restart monitoring.
+    </MudAlert>
+}
+
+<MudGrid>
+    <!-- LICENSE MANAGEMENT CARD - ADD THIS -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Key" Class="mr-2" />
+                        License Management
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body2" Class="mb-3">
+                    View your current license status, activate new licenses, or purchase a license for domain-joined devices.
+                </MudText>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Key"
+                           OnClick="@(() => Navigation.NavigateTo("/license"))">
+                    Manage License
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- ETW Monitoring Settings -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">ETW Monitoring</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <MudSwitch @bind-Value="_settings.Monitoring.EnableFileSystem"
+                               Label="File System Events" 
+                               Color="Color.Primary" />
+                    <MudSwitch @bind-Value="_settings.Monitoring.EnableRegistry"
+                               Label="Registry Events" 
+                               Color="Color.Primary" />
+                    <MudSwitch @bind-Value="_settings.Monitoring.EnableProcess"
+                               Label="Process Events" 
+                               Color="Color.Primary" />
+                    <MudSwitch @bind-Value="_settings.Monitoring.EnableNetwork"
+                               Label="Network Events" 
+                               Color="Color.Primary" />
+                    <MudSwitch @bind-Value="_settings.Monitoring.SkipOwnProcessEvents"
+                               Label="Ignore ET_Ducky process events"
+                               Color="Color.Secondary" />
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- AI Provider: Copilot -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Copilot (Azure OpenAI)</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <MudSwitch @bind-Value="_settings.AIProviders.Copilot.Enabled"
+                               Label="Enable Copilot" 
+                               Color="Color.Primary" />
+                    <MudTextField @bind-Value="_settings.AIProviders.Copilot.Endpoint"
+                                  Label="Endpoint"
+                                  Variant="Variant.Outlined"
+                                  HelperText="e.g., https://your-resource.openai.azure.com/" />
+                    <MudTextField @bind-Value="_settings.AIProviders.Copilot.ApiKey"
+                                  Label="API Key"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password" />
+                    <MudTextField @bind-Value="_settings.AIProviders.Copilot.Model"
+                                  Label="Deployment/Model"
+                                  Variant="Variant.Outlined" />
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- AI Provider: Claude -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">Claude (Anthropic)</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <MudSwitch @bind-Value="_settings.AIProviders.Claude.Enabled"
+                               Label="Enable Claude" 
+                               Color="Color.Primary" />
+                    <MudTextField @bind-Value="_settings.AIProviders.Claude.ApiKey"
+                                  Label="API Key"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password" />
+                    <MudTextField @bind-Value="_settings.AIProviders.Claude.Model"
+                                  Label="Model"
+                                  Variant="Variant.Outlined"
+                                  HelperText="e.g., claude-3-5-sonnet-20241022" />
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- AI Provider: ChatGPT -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">ChatGPT (OpenAI)</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Spacing="2">
+                    <MudSwitch @bind-Value="_settings.AIProviders.ChatGPT.Enabled"
+                               Label="Enable ChatGPT" 
+                               Color="Color.Primary" />
+                    <MudTextField @bind-Value="_settings.AIProviders.ChatGPT.ApiKey"
+                                  Label="API Key"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password" />
+                    <MudTextField @bind-Value="_settings.AIProviders.ChatGPT.Model"
+                                  Label="Model"
+                                  Variant="Variant.Outlined"
+                                  HelperText="e.g., gpt-4" />
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Save Button -->
+    <MudItem xs="12">
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   Size="Size.Large"
+                   StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="SaveSettings">
+            Save Settings
+        </MudButton>
+    </MudItem>
+    
+    <!-- Debug Info -->
+    <MudItem xs="12">
+        <MudExpansionPanels>
+            <MudExpansionPanel Text="Debug Information">
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    <strong>Settings File Location:</strong><br/>
+                    <code>@SettingsService.GetSettingsPath()</code>
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    <strong>Current Switch Values (In Memory):</strong><br/>
+                    File System: <MudChip T="string" Size="Size.Small" Color="@(_settings.Monitoring.EnableFileSystem ? Color.Success : Color.Default)">@_settings.Monitoring.EnableFileSystem</MudChip><br/>
+                    Registry: <MudChip T="string" Size="Size.Small" Color="@(_settings.Monitoring.EnableRegistry ? Color.Success : Color.Default)">@_settings.Monitoring.EnableRegistry</MudChip><br/>
+                    Process: <MudChip T="string" Size="Size.Small" Color="@(_settings.Monitoring.EnableProcess ? Color.Success : Color.Default)">@_settings.Monitoring.EnableProcess</MudChip><br/>
+                    Network: <MudChip T="string" Size="Size.Small" Color="@(_settings.Monitoring.EnableNetwork ? Color.Success : Color.Default)">@_settings.Monitoring.EnableNetwork</MudChip>
+                    Skip Own Process: <MudChip T="string" Size="Size.Small" Color="Color.Default">@_settings.Monitoring.SkipOwnProcessEvents</MudChip>
+                </MudText>
+                <MudButton Variant="Variant.Outlined" 
+                           Color="Color.Info" 
+                           Size="Size.Small"
+                           OnClick="OpenSettingsFolder">
+                    Open Settings Folder
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" 
+                           Color="Color.Warning" 
+                           Size="Size.Small"
+                           Class="ml-2"
+                           OnClick="LoadSettings">
+                    Reload Settings
+                </MudButton>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private AppSettings _settings = new();
+
+    protected override void OnInitialized()
+    {
+        LoadSettings();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Reload settings every time we navigate to this page
+        LoadSettings();
+    }
+
+    private void LoadSettings()
+    {
+        // Always get fresh settings from the service
+        _settings = SettingsService.GetSettings();
+        AIService.Initialize(_settings.AIProviders);
+        
+        System.Diagnostics.Debug.WriteLine("=== Settings Page Loaded ===");
+        System.Diagnostics.Debug.WriteLine($"File System: {_settings.Monitoring.EnableFileSystem}");
+        System.Diagnostics.Debug.WriteLine($"Registry: {_settings.Monitoring.EnableRegistry}");
+        System.Diagnostics.Debug.WriteLine($"Process: {_settings.Monitoring.EnableProcess}");
+        System.Diagnostics.Debug.WriteLine($"Network: {_settings.Monitoring.EnableNetwork}");
+        System.Diagnostics.Debug.WriteLine($"Skip Own Process: {_settings.Monitoring.SkipOwnProcessEvents}");
+        
+        StateHasChanged();
+    }
+
+    private async Task SaveSettings()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("=== Saving Settings ===");
+            System.Diagnostics.Debug.WriteLine($"File System: {_settings.Monitoring.EnableFileSystem}");
+            System.Diagnostics.Debug.WriteLine($"Registry: {_settings.Monitoring.EnableRegistry}");
+            System.Diagnostics.Debug.WriteLine($"Process: {_settings.Monitoring.EnableProcess}");
+            System.Diagnostics.Debug.WriteLine($"Network: {_settings.Monitoring.EnableNetwork}");
+            System.Diagnostics.Debug.WriteLine($"Skip Own Process: {_settings.Monitoring.SkipOwnProcessEvents}");
+            
+            await SettingsService.SaveSettingsAsync(_settings);
+            AIService.Initialize(_settings.AIProviders);
+            Snackbar.Add("Settings saved successfully!", MudBlazor.Severity.Success);
+            
+            // Reload to verify save worked
+            LoadSettings();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving settings: {ex.Message}", MudBlazor.Severity.Error);
+            System.Diagnostics.Debug.WriteLine($"Save error: {ex.Message}");
+        }
+    }
+    
+    private void OpenSettingsFolder()
+    {
+        try
+        {
+            var folder = Path.GetDirectoryName(SettingsService.GetSettingsPath());
+            if (!string.IsNullOrEmpty(folder))
+            {
+                System.Diagnostics.Process.Start("explorer.exe", folder);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error opening folder: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+}

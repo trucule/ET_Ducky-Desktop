@@ -1,0 +1,222 @@
+@page "/license"
+@using EtwMonitor.Desktop.Services
+@using EtwMonitor.Desktop.Models
+@using MudBlazor
+@inject LicenseValidationService LicenseService
+@inject DomainDetectionService DomainService
+
+@using Severity = MudBlazor.Severity
+
+<PageTitle>License - ET Ducky</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">License Management</MudText>
+
+@if (_licenseResult != null)
+{
+    <MudCard Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-2">Current License Status</MudText>
+            
+            @if (_licenseResult.IsValid)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">
+                    <MudText><strong>Status:</strong> @_licenseResult.Message</MudText>
+                </MudAlert>
+
+                @if (_licenseResult.License != null)
+                {
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudText><strong>License Type:</strong> @_licenseResult.License.Type</MudText>
+                        </MudItem>
+                        
+                        @if (_licenseResult.License.Type != LicenseType.Free && _licenseResult.License.Type != LicenseType.Lifetime)
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudText><strong>Days Remaining:</strong> @_licenseResult.License.DaysRemaining()</MudText>
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudText><strong>Expiry Date:</strong> @_licenseResult.License.ExpiryDate.ToLocalTime().ToString("MMMM dd, yyyy")</MudText>
+                            </MudItem>
+                        }
+                        
+                        @if (!string.IsNullOrEmpty(_licenseResult.License.Email))
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudText><strong>Licensed To:</strong> @_licenseResult.License.Email</MudText>
+                            </MudItem>
+                        }
+                        
+                        <MudItem xs="12" sm="6">
+                            <MudText><strong>Issued:</strong> @_licenseResult.License.IssuedDate.ToLocalTime().ToString("MMMM dd, yyyy")</MudText>
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (_licenseResult.License.Type != LicenseType.Free)
+                    {
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Error" 
+                                   Class="mt-3"
+                                   OnClick="DeactivateLicense">
+                            Deactivate License
+                        </MudButton>
+                    }
+                }
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-3">
+                    <MudText><strong>Status:</strong> @_licenseResult.Message</MudText>
+                </MudAlert>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+
+@* Domain Status Card *@
+<MudCard Class="mb-4">
+    <MudCardContent>
+        <MudText Typo="Typo.h6" Class="mb-2">Domain Status</MudText>
+        
+        @if (_domainStatus != null)
+        {
+            <MudText Class="mb-2">@_domainStatus.GetStatusMessage()</MudText>
+            
+            @if (_domainStatus.IsCurrentlyDomainJoined)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    This device is domain-joined and requires a valid license.
+                </MudAlert>
+            }
+            else if (_domainStatus.DaysSinceLastDomainJoin.HasValue && _domainStatus.DaysSinceLastDomainJoin.Value < 30)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true">
+                    This device was recently domain-joined and requires a valid license for @(30 - _domainStatus.DaysSinceLastDomainJoin.Value) more days.
+                </MudAlert>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Success" Dense="true">
+                    This device qualifies for free usage!
+                </MudAlert>
+            }
+        }
+    </MudCardContent>
+</MudCard>
+
+@* License Activation Card *@
+@if (!_licenseResult?.IsValid ?? true)
+{
+    <MudCard Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-3">Activate License</MudText>
+            
+            <MudTextField @bind-Value="_licenseKeyInput"
+                          Label="License Key"
+                          Variant="Variant.Outlined"
+                          HelperText="Enter your license key (format: XXXXX-XXXXX-XXXXX...)"
+                          Class="mb-3" />
+            
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ActivateLicense"
+                       Disabled="string.IsNullOrWhiteSpace(_licenseKeyInput)">
+                Activate License
+            </MudButton>
+
+            @if (!string.IsNullOrEmpty(_activationMessage))
+            {
+                <MudAlert Severity="@_activationSeverity" Class="mt-3">
+                    @_activationMessage
+                </MudAlert>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+
+@* Purchase Options Card *@
+<MudCard>
+    <MudCardContent>
+        <MudText Typo="Typo.h6" Class="mb-3">Purchase a License</MudText>
+        
+        <MudCard Outlined="true" Class="pa-4" Style="max-width: 500px; margin: 0 auto;">
+            <MudCardContent>
+                <MudText Typo="Typo.h5" Class="mb-2" Align="Align.Center">Pro License</MudText>
+                <MudText Class="mb-3" Align="Align.Center">
+                    For licensing quotes and information, please contact:
+                </MudText>
+                <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-3" Align="Align.Center">
+                    <a href="mailto:smith.cm717@gmail.com" style="text-decoration: none; color: inherit;">
+                        smith.cm717@gmail.com
+                    </a>
+                </MudText>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           FullWidth="true"
+                           Href="mailto:smith.cm717@gmail.com">
+                    Contact for Quote
+                </MudButton>
+            </MudCardContent>
+        </MudCard>
+
+        <MudText Typo="Typo.body2" Class="mt-4 mud-text-secondary">
+            <strong>Note:</strong> ET Ducky is free for personal use!
+        </MudText>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private LicenseValidationResult? _licenseResult;
+    private DomainStatusInfo? _domainStatus;
+    private string _licenseKeyInput = "";
+    private string _activationMessage = "";
+    private Severity _activationSeverity = Severity.Info;
+
+    protected override void OnInitialized()
+    {
+        RefreshLicenseStatus();
+    }
+
+    private void RefreshLicenseStatus()
+    {
+        _licenseResult = LicenseService.ValidateLicense();
+        _domainStatus = DomainService.GetDomainStatus();
+    }
+
+    private void ActivateLicense()
+    {
+        var result = LicenseService.ActivateLicense(_licenseKeyInput);
+        
+        if (result.IsValid)
+        {
+            _activationMessage = "License activated successfully!";
+            _activationSeverity = Severity.Success;
+            _licenseKeyInput = "";
+            RefreshLicenseStatus();
+        }
+        else
+        {
+            _activationMessage = $"Activation failed: {result.Message}";
+            _activationSeverity = Severity.Error;
+        }
+
+        StateHasChanged();
+    }
+
+    private void DeactivateLicense()
+    {
+        LicenseService.DeactivateLicense();
+        _activationMessage = "License deactivated";
+        _activationSeverity = Severity.Info;
+        RefreshLicenseStatus();
+        StateHasChanged();
+    }
+
+    private void RequestTrial()
+    {
+        // In a real application, this would open a dialog to collect email
+        // and then call your backend to generate and return a trial license
+        _activationMessage = "Please visit our website to request a trial license.";
+        _activationSeverity = Severity.Info;
+    }
+}

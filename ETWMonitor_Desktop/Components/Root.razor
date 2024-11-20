@@ -1,0 +1,25 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using EtwMonitor.Desktop.Components.Layout
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+<Router AppAssembly="@typeof(MauiProgram).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <MudContainer Class="mt-4">
+                <MudAlert Severity="MudBlazor.Severity.Error">
+                    <MudText Typo="Typo.h5">404 - Page Not Found</MudText>
+                    <MudText>Sorry, there's nothing at this address.</MudText>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/" Class="mt-2">
+                        Go to Dashboard
+                    </MudButton>
+                </MudAlert>
+            </MudContainer>
+        </LayoutView>
+    </NotFound>
+</Router>

@@ -1,0 +1,521 @@
+@page "/events"
+@using EtwMonitor.Desktop.Services
+@using EtwMonitor.Core.Models
+@inject MonitorStateService MonitorState
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Events - ET Ducky</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Captured Events</MudText>
+
+<!-- Filters and Search Card -->
+<MudCard Elevation="2" Class="mb-3">
+    <MudCardContent>
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_searchText" 
+                              Label="Search" 
+                              Placeholder="Search path, operation, process..."
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Clearable="true"
+                              Immediate="false"
+                              DebounceInterval="300" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Event Type Filter</MudText>
+                <div class="d-flex flex-row gap-2">
+                    <MudCheckBox @bind-Value="_filterFileSystem" 
+                                 Color="Color.Primary" 
+                                 Dense="true"
+                                 Label="FS" />
+                    <MudCheckBox @bind-Value="_filterRegistry" 
+                                 Color="Color.Primary" 
+                                 Dense="true"
+                                 Label="Reg" />
+                    <MudCheckBox @bind-Value="_filterProcess" 
+                                 Color="Color.Primary" 
+                                 Dense="true"
+                                 Label="Proc" />
+                    <MudCheckBox @bind-Value="_filterNetwork" 
+                                 Color="Color.Primary" 
+                                 Dense="true"
+                                 Label="Net" />
+                </div>
+            </MudItem>
+            <MudItem xs="12" md="3" Class="d-flex align-center justify-space-between">
+                <MudSwitch @bind-Value="_autoRefresh" 
+                           Color="Color.Primary" 
+                           Label="@GetAutoRefreshLabel()"
+                           T="bool" />
+                <MudChip T="string" Size="Size.Small" Color="@(_autoRefresh ? Color.Success : Color.Default)">
+                    @(_autoRefresh ? "Live" : "Paused")
+                </MudChip>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+<MudCard Elevation="2">
+    <MudCardContent>
+        @try
+        {
+            var stats = MonitorState?.GetStatistics();
+            
+            <div class="d-flex justify-space-between align-center mb-3">
+                <div>
+                    @if (stats != null)
+                    {
+                        <MudAlert Severity="MudBlazor.Severity.Info" Dense="true" Class="mb-0">
+                            <strong>@stats.TotalEvents.ToString("N0")</strong> total captured
+                            (@stats.EventsPerSecond.ToString("F1") evt/sec)
+                            | Showing page @_currentPage of @_totalPages
+                            @if (!string.IsNullOrEmpty(_searchText) || !AllFiltersSelected())
+                            {
+                                <text> | <strong>Filtered</strong></text>
+                            }
+                        </MudAlert>
+                    }
+                </div>
+                <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                    <MudButton StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="@RefreshData"
+                               Color="Color.Primary">
+                        Refresh
+                    </MudButton>
+                    <MudButton StartIcon="@Icons.Material.Filled.Delete"
+                               OnClick="@ClearAllEvents"
+                               Color="Color.Error">
+                        Clear All
+                    </MudButton>
+                </MudButtonGroup>
+            </div>
+            
+            @if (_isLoading)
+            {
+                <div class="d-flex justify-center align-center" style="height: 400px;">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                </div>
+            }
+            else if (_displayEvents.Count > 0)
+            {
+                <MudSimpleTable Dense="true" Hover="true" Class="mt-4">
+                    <thead>
+                        <tr>
+                            <th>
+                                <MudLink OnClick="@(() => ToggleSort("Time"))" Color="Color.Inherit">
+                                    Time @GetSortIcon("Time")
+                                </MudLink>
+                            </th>
+                            <th>
+                                <MudLink OnClick="@(() => ToggleSort("Type"))" Color="Color.Inherit">
+                                    Type @GetSortIcon("Type")
+                                </MudLink>
+                            </th>
+                            <th>
+                                <MudLink OnClick="@(() => ToggleSort("Process"))" Color="Color.Inherit">
+                                    Process @GetSortIcon("Process")
+                                </MudLink>
+                            </th>
+                            <th>
+                                <MudLink OnClick="@(() => ToggleSort("Operation"))" Color="Color.Inherit">
+                                    Operation @GetSortIcon("Operation")
+                                </MudLink>
+                            </th>
+                            <th>Path</th>
+                            <th>Result</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var evt in _displayEvents)
+                        {
+                            <tr style="cursor: pointer;" @onclick="@(() => ShowEventDetails(evt))">
+                                <td>@evt.Timestamp.ToString("HH:mm:ss.fff")</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetEventTypeColor(evt.Type)">
+                                        @evt.Type.ToString()
+                                    </MudChip>
+                                </td>
+                                <td>@(evt.ProcessName ?? "Unknown")</td>
+                                <td>@evt.Operation</td>
+                                <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis;">
+                                    @(evt.Path ?? evt.Details ?? "—")
+                                </td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(evt.Result))
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="@GetResultColor(evt.Result)" Variant="Variant.Text">
+                                            @evt.Result
+                                        </MudChip>
+                                    }
+                                </td>
+                                <td>
+                                    <MudIconButton Icon="@Icons.Material.Filled.Info" 
+                                                   Size="Size.Small" 
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => ShowEventDetails(evt))" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+                
+                <!-- Pagination -->
+                @if (_totalPages > 1)
+                {
+                    <div class="d-flex justify-space-between align-center mt-4">
+                        <MudText Typo="Typo.body2">
+                            Page @_currentPage of @_totalPages (@_displayEvents.Count events)
+                        </MudText>
+                        <div>
+                            <MudButton Variant="Variant.Outlined" 
+                                       Size="Size.Small"
+                                       Disabled="@(_currentPage <= 1)"
+                                       OnClick="@(() => ChangePage(1))">
+                                First
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" 
+                                       Size="Size.Small"
+                                       Disabled="@(_currentPage <= 1)"
+                                       OnClick="@(() => ChangePage(_currentPage - 1))"
+                                       Class="ml-2">
+                                Previous
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" 
+                                       Size="Size.Small"
+                                       Disabled="@(_currentPage >= _totalPages)"
+                                       OnClick="@(() => ChangePage(_currentPage + 1))"
+                                       Class="ml-2">
+                                Next
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" 
+                                       Size="Size.Small"
+                                       Disabled="@(_currentPage >= _totalPages)"
+                                       OnClick="@(() => ChangePage(_totalPages))"
+                                       Class="ml-2">
+                                Last
+                            </MudButton>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <MudAlert Severity="MudBlazor.Severity.Info">
+                    <MudText Typo="Typo.h6">No events captured yet</MudText>
+                    <MudText>Start monitoring to see ETW events appear here.</MudText>
+                </MudAlert>
+            }
+        }
+        catch (Exception ex)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Error">
+                <MudText Typo="Typo.h6">Error</MudText>
+                <MudText>@ex.Message</MudText>
+            </MudAlert>
+        }
+    </MudCardContent>
+</MudCard>
+
+<!-- Event Details Dialog -->
+<MudDialog @bind-IsVisible="_showDetailsDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Event Details</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_selectedEvent != null)
+        {
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Timestamp</strong></MudText>
+                    <MudText>@_selectedEvent.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</MudText>
+                </MudItem>
+                
+                <MudItem xs="6">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Type</strong></MudText>
+                    <MudChip T="string" Color="@GetEventTypeColor(_selectedEvent.Type)">
+                        @_selectedEvent.Type.ToString()
+                    </MudChip>
+                </MudItem>
+                
+                <MudItem xs="6">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Process</strong></MudText>
+                    <MudText>@(_selectedEvent.ProcessName ?? "Unknown") (PID: @_selectedEvent.ProcessId)</MudText>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Operation</strong></MudText>
+                    <MudText>@_selectedEvent.Operation</MudText>
+                </MudItem>
+                
+                @if (!string.IsNullOrEmpty(_selectedEvent.Path))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Path</strong></MudText>
+                        <MudText Style="word-break: break-all;">@_selectedEvent.Path</MudText>
+                    </MudItem>
+                }
+                
+                @if (!string.IsNullOrEmpty(_selectedEvent.Details))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Details</strong></MudText>
+                        <MudText Style="word-break: break-all;">@_selectedEvent.Details</MudText>
+                    </MudItem>
+                }
+                
+                @if (!string.IsNullOrEmpty(_selectedEvent.Result))
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Result</strong></MudText>
+                        <MudChip T="string" Color="@GetResultColor(_selectedEvent.Result)" Size="Size.Small">
+                            @_selectedEvent.Result
+                        </MudChip>
+                    </MudItem>
+                }
+                
+                @if (_selectedEvent.Duration > 0)
+                {
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Class="mb-1"><strong>Duration</strong></MudText>
+                        <MudText>@_selectedEvent.Duration ms</MudText>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showDetailsDialog = false)" Color="Color.Primary">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    // Event type filters (checkboxes)
+    private bool _filterFileSystem = true;
+    private bool _filterRegistry = true;
+    private bool _filterProcess = true;
+    private bool _filterNetwork = true;
+    
+    private string _searchText = string.Empty;
+    private bool _autoRefresh = true;  // AUTO-REFRESH ON BY DEFAULT
+    private System.Threading.Timer? _refreshTimer;
+    private bool _isLoading = false;
+    
+    // Pagination - OPTIMIZED
+    private int _currentPage = 1;
+    private int _pageSize = 100;  // Show more per page
+    private int _totalPages = 1;
+    private List<SystemEvent> _displayEvents = new();
+    
+    // Sorting
+    private string _sortColumn = "Time";
+    private bool _sortDescending = true;
+    
+    // Details dialog
+    private bool _showDetailsDialog = false;
+    private SystemEvent? _selectedEvent;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // Set up auto-refresh timer
+        _refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            if (_autoRefresh)
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadEventsAsync();
+                    StateHasChanged();
+                });
+            }
+        }, null, Timeout.Infinite, Timeout.Infinite);
+        
+        // FIXED: Load initial data and await it
+        await LoadEventsAsync();
+    }
+    
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            // Start/stop timer based on auto-refresh setting
+            if (_autoRefresh)
+            {
+                // FIXED: Correct timer parameters (delay, period)
+                _refreshTimer?.Change(500, 500); // Refresh every 0.5 seconds
+            }
+            else
+            {
+                _refreshTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            }
+        }
+    }
+    
+    // OPTIMIZED: Load only what's needed for current page
+    private async Task LoadEventsAsync()
+    {
+        try
+        {
+            _isLoading = true;
+            
+            await Task.Run(() =>
+            {
+                // Get only the most recent events (limit memory usage)
+                var recentCount = Math.Min(50000, MonitorState?.GetStatistics().TotalEvents ?? 0);
+                var allEvents = MonitorState?.GetCapturedEvents(recentCount) ?? new List<SystemEvent>();
+                
+                // Apply filters
+                var filteredEvents = ApplyFilters(allEvents);
+                
+                // Calculate pagination
+                _totalPages = (int)Math.Ceiling(filteredEvents.Count / (double)_pageSize);
+                _currentPage = Math.Min(_currentPage, Math.Max(1, _totalPages));
+                
+                // Get only current page
+                var skip = (_currentPage - 1) * _pageSize;
+                _displayEvents = filteredEvents.Skip(skip).Take(_pageSize).ToList();
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error loading events: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+    
+    private List<SystemEvent> ApplyFilters(List<SystemEvent> events)
+    {
+        var filtered = events.AsEnumerable();
+        
+        // Filter by event type (multi-select with checkboxes)
+        var selectedTypes = new List<EventType>();
+        if (_filterFileSystem) selectedTypes.Add(EventType.FileSystem);
+        if (_filterRegistry) selectedTypes.Add(EventType.Registry);
+        if (_filterProcess) selectedTypes.Add(EventType.Process);
+        if (_filterNetwork) selectedTypes.Add(EventType.Network);
+        
+        // Only filter if at least one type is selected
+        if (selectedTypes.Any())
+        {
+            filtered = filtered.Where(e => selectedTypes.Contains(e.Type));
+        }
+        
+        // Filter by search text
+        if (!string.IsNullOrEmpty(_searchText))
+        {
+            var searchLower = _searchText.ToLowerInvariant();
+            filtered = filtered.Where(e =>
+                (e.Path?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (e.Operation?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (e.ProcessName?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (e.Details?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false)
+            );
+        }
+        
+        // Sort
+        filtered = _sortColumn switch
+        {
+            "Time" => _sortDescending ? filtered.OrderByDescending(e => e.Timestamp) : filtered.OrderBy(e => e.Timestamp),
+            "Type" => _sortDescending ? filtered.OrderByDescending(e => e.Type) : filtered.OrderBy(e => e.Type),
+            "Process" => _sortDescending ? filtered.OrderByDescending(e => e.ProcessName ?? "") : filtered.OrderBy(e => e.ProcessName ?? ""),
+            "Operation" => _sortDescending ? filtered.OrderByDescending(e => e.Operation) : filtered.OrderBy(e => e.Operation),
+            _ => filtered.OrderByDescending(e => e.Timestamp)
+        };
+        
+        return filtered.ToList();
+    }
+    
+    private async Task RefreshData()
+    {
+        await LoadEventsAsync();
+    }
+    
+    private async Task ClearAllEvents()
+    {
+        // This would need to be implemented in MonitorStateService
+        _displayEvents.Clear();
+        _currentPage = 1;
+        StateHasChanged();
+    }
+    
+    private async Task ChangePage(int page)
+    {
+        _currentPage = page;
+        await LoadEventsAsync();
+    }
+    
+    private void ToggleSort(string column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortDescending = !_sortDescending;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortDescending = true;
+        }
+        _ = LoadEventsAsync();
+    }
+    
+    private string GetSortIcon(string column)
+    {
+        if (_sortColumn != column)
+            return "";
+        return _sortDescending ? "▼" : "▲";
+    }
+    
+    private void ShowEventDetails(SystemEvent evt)
+    {
+        _selectedEvent = evt;
+        _showDetailsDialog = true;
+    }
+    
+    private Color GetEventTypeColor(EventType type)
+    {
+        return type switch
+        {
+            EventType.FileSystem => Color.Primary,
+            EventType.Registry => Color.Secondary,
+            EventType.Process => Color.Success,
+            EventType.Network => Color.Info,
+            _ => Color.Default
+        };
+    }
+    
+    private Color GetResultColor(string? result)
+    {
+        if (string.IsNullOrEmpty(result))
+            return Color.Default;
+            
+        if (result.Contains("SUCCESS", StringComparison.OrdinalIgnoreCase))
+            return Color.Success;
+        if (result.Contains("ERROR", StringComparison.OrdinalIgnoreCase) || 
+            result.Contains("FAIL", StringComparison.OrdinalIgnoreCase))
+            return Color.Error;
+        if (result.Contains("WARN", StringComparison.OrdinalIgnoreCase))
+            return Color.Warning;
+            
+        return Color.Default;
+    }
+    
+    private bool AllFiltersSelected()
+    {
+        return _filterFileSystem && _filterRegistry && _filterProcess && _filterNetwork;
+    }
+    
+    private string GetAutoRefreshLabel()
+    {
+        return _autoRefresh ? "Auto-refresh (0.5s)" : "Auto-refresh";
+    }
+    
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+}

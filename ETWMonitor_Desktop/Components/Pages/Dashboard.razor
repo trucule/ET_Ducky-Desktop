@@ -1,0 +1,357 @@
+@page "/"
+@using EtwMonitor.Desktop.Services
+@using EtwMonitor.Core.Models
+@inject MonitorStateService MonitorState
+@inject SettingsService Settings
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>Dashboard - ET Ducky</PageTitle>
+
+<MudGrid>
+    <!-- AI Insights Card -->
+    <MudItem xs="12" md="6">
+        <AIInsightsCard />
+    </MudItem>
+    
+    <!-- Monitoring Control Card -->
+    <MudItem xs="12" md="6">
+        <MudCard Elevation="2">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h5">
+                        <MudIcon Icon="@Icons.Material.Filled.MonitorHeart" Class="mr-2" />
+                        Monitoring Control
+                    </MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    @if (MonitorState.IsMonitoring)
+                    {
+                        <div class="status-indicator status-running"></div>
+                        <MudText Typo="Typo.h6" Color="Color.Success">Running</MudText>
+                        <MudSpacer />
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Error" 
+                                   Size="Size.Large"
+                                   StartIcon="@Icons.Material.Filled.Stop"
+                                   OnClick="@StopMonitoring"
+                                   Disabled="@_isProcessing">
+                            @if (_isProcessing) 
+                            { 
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            }
+                            Stop Monitoring
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <div class="status-indicator status-stopped"></div>
+                        <MudText Typo="Typo.h6">Stopped</MudText>
+                        <MudSpacer />
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Success" 
+                                   Size="Size.Large"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="@StartMonitoring"
+                                   Disabled="@_isProcessing">
+                            @if (_isProcessing) 
+                            { 
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            }
+                            Start Monitoring
+                        </MudButton>
+                    }
+                </MudStack>
+                
+                @if (!MonitorState.IsMonitoring)
+                {
+                    <MudAlert Severity="MudBlazor.Severity.Info" Class="mt-4">
+                        Click "Start Monitoring" to begin capturing ETW events from your system.
+                    </MudAlert>
+                    
+                    <!-- Show current monitoring configuration -->
+                    <MudPaper Class="mt-4 pa-3" Elevation="0">
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Enabled Event Types:</MudText>
+                        <MudChipSet T="string">
+                            @if (_monitoringConfig.EnableFileSystem)
+                            {
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Folder" Color="Color.Primary" Size="Size.Small">File System</MudChip>
+                            }
+                            @if (_monitoringConfig.EnableRegistry)
+                            {
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Settings" Color="Color.Primary" Size="Size.Small">Registry</MudChip>
+                            }
+                            @if (_monitoringConfig.EnableProcess)
+                            {
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Memory" Color="Color.Primary" Size="Size.Small">Process</MudChip>
+                            }
+                            @if (_monitoringConfig.EnableNetwork)
+                            {
+                                <MudChip T="string" Icon="@Icons.Material.Filled.NetworkCheck" Color="Color.Primary" Size="Size.Small">Network</MudChip>
+                            }
+                            @if (!_monitoringConfig.EnableFileSystem && !_monitoringConfig.EnableRegistry && 
+                                 !_monitoringConfig.EnableProcess && !_monitoringConfig.EnableNetwork)
+                            {
+                                <MudChip T="string" Color="Color.Warning" Size="Size.Small">No event types enabled - Configure in Settings</MudChip>
+                            }
+                        </MudChipSet>
+                    </MudPaper>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Statistics Cards -->
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Large" Color="Color.Primary" />
+                <div class="stat-value">@_stats.TotalEvents.ToString("N0")</div>
+                <div class="stat-label">Total Events</div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.Speed" Size="Size.Large" Color="Color.Info" />
+                <div class="stat-value">@_stats.EventsPerSecond.ToString("F0")</div>
+                <div class="stat-label">Events/Second</div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Large" Color="Color.Warning" />
+                <div class="stat-value">@_stats.TotalPatterns</div>
+                <div class="stat-label">Patterns Detected</div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="3">
+        <MudCard Elevation="2" Class="stat-card">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.Timer" Size="Size.Large" Color="Color.Success" />
+                <div class="stat-value">@_stats.Uptime.ToString(@"hh\:mm\:ss")</div>
+                <div class="stat-label">Uptime</div>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+
+    <!-- Recent Patterns (only show if there are patterns) -->
+    @if (_recentPatterns.Any())
+    {
+        <MudItem xs="12">
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h5">
+                            <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-2" />
+                            Recent Patterns
+                        </MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudStack Spacing="2">
+                        @foreach (var pattern in _recentPatterns.Take(5))
+                        {
+                            <PatternCard Pattern="@pattern" OnAnalyzeClick="@(() => NavigateToAI(pattern))" />
+                        }
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private MonitorStatistics _stats = new();
+    private List<DetectedPattern> _recentPatterns = new();
+    private System.Threading.Timer? _updateTimer;
+    private MonitoringConfiguration _monitoringConfig = new();
+    private bool _isProcessing = false;
+    private static string _logFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "ETWMonitor_Debug.log");
+
+    private void Log(string message)
+    {
+        try
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
+            var line = $"[{timestamp}] {message}\r\n";
+            File.AppendAllText(_logFile, line);
+        }
+        catch { }
+    }
+
+    protected override void OnInitialized()
+    {
+        Log("[Dashboard] OnInitialized START");
+        
+        // Load settings and initialize
+        var settings = Settings.GetSettings();
+        _monitoringConfig = settings.Monitoring;
+        
+        Log($"[Dashboard] Current monitoring state: {MonitorState.IsMonitoring}");
+        Log($"[Dashboard] _isProcessing: {_isProcessing}");
+        
+        MonitorState.MonitoringStateChanged += OnMonitoringStateChanged;
+        MonitorState.PatternDetected += OnPatternDetected;
+        
+        Log("[Dashboard] Event handlers attached");
+        
+        // Update stats every second - runs always but only updates when monitoring
+        _updateTimer = new System.Threading.Timer(_ => 
+        {
+            _stats = MonitorState.GetStatistics();
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        
+        Log("[Dashboard] OnInitialized COMPLETE");
+    }
+
+    private void OnMonitoringStateChanged(object? sender, bool isRunning)
+    {
+        Log($"[Dashboard] OnMonitoringStateChanged FIRED - isRunning: {isRunning}, Thread: {Thread.CurrentThread.ManagedThreadId}");
+        Log($"[Dashboard] Before change - _isProcessing: {_isProcessing}");
+        
+        _isProcessing = false;
+        
+        Log($"[Dashboard] After change - _isProcessing: {_isProcessing}");
+        
+        // Force UI update on UI thread
+        try
+        {
+            _ = InvokeAsync(() =>
+            {
+                Log($"[Dashboard] InvokeAsync executing, isRunning: {isRunning}");
+                StateHasChanged();
+                Log($"[Dashboard] StateHasChanged called");
+            });
+        }
+        catch (Exception ex)
+        {
+            Log($"[Dashboard] ERROR in OnMonitoringStateChanged: {ex.Message}");
+        }
+    }
+
+    private void OnPatternDetected(object? sender, DetectedPattern pattern)
+    {
+        _recentPatterns.Insert(0, pattern);
+        if (_recentPatterns.Count > 10)
+            _recentPatterns.RemoveAt(_recentPatterns.Count - 1);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StartMonitoring()
+    {
+        Log($"[Dashboard] StartMonitoring called - _isProcessing: {_isProcessing}");
+        
+        if (_isProcessing)
+        {
+            Log("[Dashboard] StartMonitoring - Already processing, returning");
+            return;
+        }
+        
+        try
+        {
+            _isProcessing = true;
+            Log($"[Dashboard] StartMonitoring - Set _isProcessing to true");
+            await InvokeAsync(StateHasChanged);
+            
+            Log("[Dashboard] StartMonitoring - About to call MonitorState.StartMonitoringAsync");
+            
+            // Small delay to ensure UI updates
+            await Task.Delay(100);
+            
+            await MonitorState.StartMonitoringAsync();
+            
+            Log("[Dashboard] StartMonitoring - MonitorState.StartMonitoringAsync completed");
+            
+            // Reload config in case it changed
+            var settings = Settings.GetSettings();
+            _monitoringConfig = settings.Monitoring;
+            
+            Snackbar.Add("Monitoring started successfully!", MudBlazor.Severity.Success);
+            Log("[Dashboard] StartMonitoring - Success message shown");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Log("[Dashboard] StartMonitoring - UnauthorizedAccessException");
+            Snackbar.Add("Administrator privileges required. Please run as Administrator.", MudBlazor.Severity.Error);
+        }
+        catch (Exception ex)
+        {
+            Log($"[Dashboard] StartMonitoring - Exception: {ex.Message}");
+            Snackbar.Add($"Error starting monitoring: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            Log($"[Dashboard] StartMonitoring - Finally block, set _isProcessing to false");
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StopMonitoring()
+    {
+        Log($"[Dashboard] StopMonitoring called - _isProcessing: {_isProcessing}");
+        
+        if (_isProcessing)
+        {
+            Log("[Dashboard] StopMonitoring - Already processing, returning");
+            return;
+        }
+        
+        try
+        {
+            _isProcessing = true;
+            Log($"[Dashboard] StopMonitoring - Set _isProcessing to true");
+            await InvokeAsync(StateHasChanged);
+            
+            Log("[Dashboard] StopMonitoring - About to call MonitorState.StopMonitoringAsync");
+            
+            // Small delay to ensure UI updates
+            await Task.Delay(100);
+            
+            await MonitorState.StopMonitoringAsync();
+            
+            Log("[Dashboard] StopMonitoring - MonitorState.StopMonitoringAsync completed");
+            
+            // Additional delay to ensure cleanup completes
+            await Task.Delay(200);
+            
+            Snackbar.Add("Monitoring stopped.", MudBlazor.Severity.Info);
+            Log("[Dashboard] StopMonitoring - Success message shown");
+        }
+        catch (Exception ex)
+        {
+            Log($"[Dashboard] StopMonitoring - Exception: {ex.Message}");
+            Snackbar.Add($"Error stopping monitoring: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            Log($"[Dashboard] StopMonitoring - Finally block, set _isProcessing to false");
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void NavigateToAI(DetectedPattern pattern)
+    {
+        Navigation.NavigateTo($"/ai?patternId={pattern.Id}");
+    }
+
+    public void Dispose()
+    {
+        MonitorState.MonitoringStateChanged -= OnMonitoringStateChanged;
+        MonitorState.PatternDetected -= OnPatternDetected;
+        _updateTimer?.Dispose();
+    }
+}

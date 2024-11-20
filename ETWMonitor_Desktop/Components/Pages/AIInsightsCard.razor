@@ -1,0 +1,240 @@
+@using EtwMonitor.Desktop.Services
+@inject AIAnalysisService AIAnalysis
+@inject DiagnosticsService Diagnostics
+@inject MonitorStateService MonitorState
+@implements IDisposable
+
+<MudCard Elevation="2">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Psychology" />
+                <MudText Typo="Typo.h6">AI Insights</MudText>
+                <MudSpacer />
+                <MudSwitch @bind-Value="_isEnabled" 
+                           Color="Color.Primary" 
+                           Size="Size.Small"
+                           Label="@(_isEnabled ? "Enabled" : "Disabled")"
+                           T="bool" />
+            </MudStack>
+            <MudStack Row="true" Spacing="2" Class="mt-2">
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="_runningDiag"
+                           OnClick="RunDiskSpaceDiagnostic"
+                           Size="Size.Small">
+                    @if (_runningDiag)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-1" />
+                        <text>Running...</text>
+                    }
+                    else
+                    {
+                        <text>Check Disk</text>
+                    }
+                </MudButton>
+
+                <MudButton Variant="Variant.Outlined"
+                           Disabled="_runningDiag"
+                           OnClick="RunLargeFileScan"
+                           Size="Size.Small">
+                    Scan Large Files
+                </MudButton>
+            </MudStack>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (!_isEnabled && !MonitorState.IsMonitoring)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Info" Dense="true" Class="mb-3">
+                AI monitoring is disabled. You can enable it or manually analyze captured events.
+            </MudAlert>
+            
+            @if (_availableEvents > 0)
+            {
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.Analytics"
+                           Disabled="@_isAnalyzing"
+                           OnClick="AnalyzeNow">
+                    @if (_isAnalyzing)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <text>Analyzing...</text>
+                    }
+                    else
+                    {
+                        <text>Analyze Event Log (@_availableEvents.ToString("N0") events)</text>
+                    }
+                </MudButton>
+            }
+            else
+            {
+                <MudAlert Severity="MudBlazor.Severity.Warning" Dense="true">
+                    No events captured. Start monitoring to capture events.
+                </MudAlert>
+            }
+        }
+        else if (!_isEnabled)
+        {
+            <MudAlert Severity="MudBlazor.Severity.Info" Dense="true">
+                Enable AI analysis to get real-time insights about system activity.
+            </MudAlert>
+        }
+        else if (_insights.Count == 0)
+        {
+            <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="pa-4">
+                <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+                <MudText Typo="Typo.body2">AI is monitoring your system...</MudText>
+                <MudText Typo="Typo.caption">First analysis will appear within 30 seconds</MudText>
+            </MudStack>
+        }
+        else
+        {
+            <MudTimeline TimelinePosition="TimelinePosition.Start" TimelineOrientation="TimelineOrientation.Vertical">
+                @foreach (var insight in _insights.Take(5))
+                {
+                    <MudTimelineItem Color="@GetSeverityColor(insight.Severity)" Size="Size.Small">
+                        <ItemOpposite>
+                            <MudText Typo="Typo.caption">@insight.Timestamp.ToString("HH:mm:ss")</MudText>
+                        </ItemOpposite>
+                        <ItemContent>
+                            <MudPaper Elevation="1" Class="pa-3">
+                                <MudText Typo="Typo.subtitle2" Class="mb-2">
+                                    @insight.Title
+                                </MudText>
+                                <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">
+                                    @insight.Analysis
+                                </MudText>
+                                <MudText Typo="Typo.caption" Class="mt-2">
+                                    Based on @insight.EventCount events
+                                </MudText>
+                            </MudPaper>
+                        </ItemContent>
+                    </MudTimelineItem>
+                }
+            </MudTimeline>
+            
+            @if (_insights.Count > 5)
+            {
+                <MudButton Variant="Variant.Text" 
+                           Color="Color.Primary" 
+                           FullWidth="true"
+                           Href="/ai-insights">
+                    View All Insights (@_insights.Count)
+                </MudButton>
+            }
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private bool _isEnabled = false;
+    private bool _isAnalyzing = false;
+    private List<AIInsight> _insights = new();
+    private int _availableEvents = 0;
+    private bool _runningDiag = false;
+
+    protected override void OnInitialized()
+    {
+        AIAnalysis.InsightGenerated += OnInsightGenerated;
+        _isEnabled = AIAnalysis.IsEnabled;
+        _availableEvents = MonitorState.GetCapturedEvents().Count;
+        RefreshInsights();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && _isEnabled != AIAnalysis.IsEnabled)
+        {
+            _isEnabled = AIAnalysis.IsEnabled;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RunDiskSpaceDiagnostic()
+    {
+        _runningDiag = true;
+        StateHasChanged();
+
+        var result = await Diagnostics.RunActionAsync(DiagnosticActionType.CheckFreeDiskSpace);
+        await AIAnalysis.AnalyzeDiagnosticResultAsync("Card-triggered: Check free disk space", result);
+
+        _runningDiag = false;
+        StateHasChanged();
+    }
+
+    private async Task RunLargeFileScan()
+    {
+        _runningDiag = true;
+        StateHasChanged();
+
+        var result = await Diagnostics.RunActionAsync(DiagnosticActionType.ScanFolderForLargeFiles, @"C:\");
+        await AIAnalysis.AnalyzeDiagnosticResultAsync("Card-triggered: Scan C:\\ for large files", result);
+
+        _runningDiag = false;
+        StateHasChanged();
+    }
+
+    private async Task AnalyzeNow()
+    {
+        _isAnalyzing = true;
+        StateHasChanged();
+
+        try
+        {
+            var insight = await AIAnalysis.AnalyzeCurrentEventsAsync();
+            if (insight != null)
+            {
+                RefreshInsights();
+            }
+        }
+        finally
+        {
+            _isAnalyzing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OnInsightGenerated(object? sender, AIInsight insight)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshInsights()
+    {
+        _insights = AIAnalysis.RecentInsights.OrderByDescending(i => i.Timestamp).ToList();
+    }
+
+    private void OnEnabledChanged(bool enabled)
+    {
+        _isEnabled = enabled;
+        
+        if (enabled)
+        {
+            AIAnalysis.Start();
+        }
+        else
+        {
+            AIAnalysis.Stop();
+        }
+        
+        StateHasChanged();
+    }
+
+    private Color GetSeverityColor(InsightSeverity severity)
+    {
+        return severity switch
+        {
+            InsightSeverity.High => Color.Error,
+            InsightSeverity.Medium => Color.Warning,
+            InsightSeverity.Low => Color.Success,
+            _ => Color.Default
+        };
+    }
+
+    public void Dispose()
+    {
+        AIAnalysis.InsightGenerated -= OnInsightGenerated;
+    }
+}

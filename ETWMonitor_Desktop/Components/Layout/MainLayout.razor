@@ -1,0 +1,81 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@_theme" IsDarkMode="@_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@ToggleDrawer" />
+        <img src="ET_Ducky.jpg" alt="ET Ducky Logo" style="height: 40px; margin-left: 12px; margin-right: 8px;" />
+        <MudText Typo="Typo.h5">ET Ducky</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+                       Color="Color.Inherit" 
+                       OnClick="@ToggleDarkMode" 
+                       Title="Toggle Dark Mode" />
+        <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Inherit" Href="/settings" />
+    </MudAppBar>
+    
+    <MudDrawer @bind-Open="@_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <MudNavMenu>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+                Dashboard
+            </MudNavLink>
+            <MudNavLink Href="/events" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.List">
+                Events
+            </MudNavLink>
+            <MudNavLink Href="/patterns" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Pattern">
+                Patterns
+            </MudNavLink>
+            <MudNavLink Href="/ai" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Psychology">
+                AI Assistant
+            </MudNavLink>
+            <MudNavLink Href="/settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">
+                Settings
+            </MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+    
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = true;
+    private bool _isDarkMode = true; // Default to dark mode
+
+    private MudTheme _theme = new MudTheme()
+    {
+        PaletteLight = new PaletteLight()
+        {
+            Primary = "#594ae2",
+            Secondary = "#ff4081",
+            AppbarBackground = "#594ae2",
+        },
+        PaletteDark = new PaletteDark()
+        {
+            Primary = "#776be7",
+            Secondary = "#ff4081",
+            AppbarBackground = "#1e1e2e",
+            Background = "#1e1e2e",
+            Surface = "#2a2a3a",
+            DrawerBackground = "#1e1e2e",
+        }
+    };
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private void ToggleDarkMode()
+    {
+        _isDarkMode = !_isDarkMode;
+        StateHasChanged();
+    }
+}
