@@ -76,6 +76,7 @@ Diagnostic results feed into insights.
 The assistant can analyze event history, summarize activity, and interpret diagnostics.
 
 ### Settings
+Manage your license, configure event types to be scanned, and configure API keys for your preferred AI tool.
 
 #### Monitoring
 - Enable or disable ETW providers  
