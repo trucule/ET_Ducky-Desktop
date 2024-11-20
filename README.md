@@ -1,6 +1,6 @@
-# ETW Monitor Desktop
+# ET_Ducky-Desktop
 
-ETW Monitor Desktop is a Windows diagnostic and troubleshooting application built on top of Event Tracing for Windows (ETW).  
+ET_Ducky-Desktop is a Windows diagnostic and troubleshooting application built on top of Event Tracing for Windows (ETW).  
 It provides real-time visibility into system behavior including file activity, registry writes, process launches, and more — all presented in a clear and searchable UI.
 
 The application is designed for power users, system administrators, developers, SOC/IR roles, and anyone who needs deeper visibility into what their system is doing.
