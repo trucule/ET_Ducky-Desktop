@@ -52,15 +52,8 @@ If you need to know **what happened**, **when**, and **why**, ETW Monitor makes 
 
 ## Installation
 
-### Option 1 — Download the MSI Installer
+### Download the MSI Installer
 Visit the Releases page and download the latest `.msi` installer.
-
-### Option 2 — Portable Build
-Extract the `.zip` and run:
-
-```
-ET_Ducky.exe
-```
 
 ## Usage Guide
 
