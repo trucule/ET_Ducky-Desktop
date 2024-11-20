@@ -43,7 +43,7 @@ Windows hides most internal activity from plain view. ET_Ducky provides:
 
 If you need to know **what happened**, **when**, and **why**, ETW Monitor makes that observable.
 
-## Screenshots (placeholders)
+## Screenshots
 
 <img width="1912" height="996" alt="Image" src="https://github.com/user-attachments/assets/bd1d1a77-a626-4600-b5c4-0f87f704b6ac" />
 <img width="1917" height="999" alt="Image" src="https://github.com/user-attachments/assets/9dae7dea-1cbe-4361-a517-85769586056c" />
