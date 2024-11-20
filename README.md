@@ -32,7 +32,7 @@ The application is designed for power users, system administrators, developers, 
 
 ## Why Use ET_Ducky-Desktop?
 
-Windows hides most internal activity from plain view. ETW Monitor provides:
+Windows hides most internal activity from plain view. ET_Ducky provides:
 
 - Insight into unexpected file or registry writes  
 - Visibility into what processes are doing  
