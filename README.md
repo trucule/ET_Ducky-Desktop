@@ -52,8 +52,15 @@ If you need to know **what happened**, **when**, and **why**, ETW Monitor makes 
 
 ## Installation
 
-### Download the MSI Installer
+### Portable Installation
+Visit the Releases page and download the ET_Ducky_Portable.zip
+Extract the ZIP file to any location (e.g., C:\Tools\ET_Ducky or a USB drive)
+Run Launch_ET_Ducky.bat as Administrator
+- Right-click Launch_ET_Ducky.bat → "Run as administrator"
+  
+### MSI Installation
 Visit the Releases page and download the latest `.msi` installer.
+Install locally and run as admin.
 
 ## Usage Guide
 
